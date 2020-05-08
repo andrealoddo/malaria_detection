@@ -1,11 +1,11 @@
 %% 1. Load the Database
 % Images and GT Labels Datapath - Local
-%impath = 'C:\Users\loand\Documents\GitHub\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\img';
-%labpath = 'C:\Users\loand\Documents\GitHub\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\gt';
+impath = 'C:\Users\loand\Documents\GitHub\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\img';
+labpath = 'C:\Users\loand\Documents\GitHub\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\gt';
 
 % Images and GT Labels Datapath - Server
-impath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/img';
-labpath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/gt';
+%impath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/img';
+%labpath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/gt';
 
  
 % Images and Labels Datastore
@@ -15,7 +15,7 @@ lds = imageDatastore(labpath);
 % Determine the split up
 %total_split = countEachLabel(imds);
 
-%% Network
+%% Network loading 
 if isfile('models/TrainingOnNihDataset/AlexNet.mat')
     load('models/TrainingOnNihDataset/AlexNet.mat');
 else
@@ -36,7 +36,7 @@ end
 [learnableLayer, classLayer] = findLayersToReplace(lgraph);
 
 % Define the new layers 
-numClasses = 2;
+numClasses = 2; % Parasite vs Not Parasite
 
 if isa(learnableLayer,'nnet.cnn.layer.FullyConnectedLayer')
     newLearnableLayer = fullyConnectedLayer(numClasses, ...
@@ -72,7 +72,7 @@ malariaDataset = table;
 malariaDataset.imageFilename = imds.Files(:);
 
 
-%% 2. Conversion of BW ground-truths to rectangular bounding boxes to train the detector 
+%% 2 semel. Conversion of BW ground-truths to rectangular bounding boxes to train the detector 
 for i=1:numel(imds.Files)
     
     I = imread(imds.Files{i});
@@ -97,7 +97,6 @@ for i=1:numel(imds.Files)
     
 end
 
-
 %% 3. Train the detector
 % The training data is stored in a table. 
 % The first column contains the path to the image files. 
@@ -111,6 +110,8 @@ train_perc = 0.8;
 idx = floor(train_perc * height(malariaDataset));
 trainingIdx = 1:idx;
 trainingDataTbl = malariaDataset(shuffledIndices(trainingIdx),:);
+
+trainingDataAugTbl = repelem(trainingDataTbl, 5, 1); 
 
 valid_perc = 0.0;
 validationIdx = idx+1 : idx + 1 + floor(valid_perc * length(shuffledIndices) );
@@ -139,6 +140,18 @@ imdsTrain.ReadFcn = @(filename)preprocess_mpidb_images(filename, [layers(1).Inpu
 imdsValid.ReadFcn = @(filename)preprocess_mpidb_images(filename, [layers(1).InputSize(1), layers(1).InputSize(2)]);
 
 
+%% X. Data augmentation
+numRep = 5;
+imTrainAug = repelem(imdsTrain.Files, numRep, 1); 
+imdsTrainAug = imageDatastore(imTrainAug);
+
+blTrainAug = repelem(bldsTrain.LabelData, numRep, 1); 
+bldsTrainAug = boxLabelDatastore(cell2table(blTrainAug));
+
+trainingDataAug = combine(imdsTrainAug, bldsTrainAug);
+trainingDataAug = transform(trainingDataAug, @augmentData);
+
+
 %% 6. Combination 
 % Combine image and box label datastores.
 trainingData = combine(imdsTrain, bldsTrain);
@@ -153,13 +166,15 @@ options = trainingOptions('sgdm', ...
     'InitialLearnRate', 1e-6, ...
     'MaxEpochs', 30);
 
-detector = trainRCNNObjectDetector(trainingDataTbl, lgraph, options, 'NegativeOverlapRange', [0 0.3]);
+detector = trainRCNNObjectDetector(trainingDataAugTbl, lgraph, options, 'NegativeOverlapRange', [0 0.3]);
 
 
 %% 8. Test the network
 I = imread(testDataTb1.imageFilename{1});
-[bboxes,scores,label] = detect(detector,I);
+[bboxes, scores, label] = detect(detector,I);
 
 % Display the results.
 I = insertObjectAnnotation(I,'rectangle',bboxes,scores);
 figure, imshow(I); 
+
+

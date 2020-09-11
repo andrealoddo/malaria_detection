@@ -1,2 +1,6 @@
+# Folders
 old/
+
+# File extensions
 *.mat
+*.asv

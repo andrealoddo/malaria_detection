@@ -1,6 +1,6 @@
 function Iout = preprocess_mpidb_images(filename, desired_size)
 
-    % This function preprocesses malaria images using color constancy
+    % This function preprocesses MP-IDB images using color constancy
     % technique and later reshapes them to an image of desired size
 
     % Read the Image

@@ -1,15 +1,32 @@
 %% Object Detection Using Faster R-CNN Deep Learning
 % source: https://www.mathworks.com/help/vision/examples/object-detection-using-faster-r-cnn-deep-learning.html
 
-%% 0. Train the detector or load a pre-trained network
-doTrainingAndEval = true;
-
-% TODO: change the .mat filename
-if ~doTrainingAndEval && exist('models/Detectors/fasterRCNNResNet50EndToEndVehicleExample.mat', 'file')
-    load('models/Detectors/fasterRCNNResNet50EndToEndVehicleExample.mat');
+%% 0. Show figures
+showFigures = false;
+if ~showFigures
+    set(0,'DefaultFigureVisible','off')
 end
 
-%% 0. Load pretrained Model
+%% 0. Settings
+if ispc
+    datasetpath = 'C:\Users\loand\Documents\GitHub\Datasets\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\';
+    impath = strcat(datasetpath, 'img');
+    labelpath = strcat(datasetpath, 'gt');
+    labelfile = strcat(datasetpath, 'mp-idb-falciparum.csv');
+else
+    datasetpath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/';
+    impath = strcat(datasetpath, 'img');
+    labelpath = strcat(datasetpath, 'gt');
+    labelfile = strcat(datasetpath, 'mp-idb-falciparum.csv');
+end
+
+%% 0. Train the detector or load a pre-trained network
+doTrainingAndEval = true;
+if ~doTrainingAndEval && exist('models/detectors/fasterRCNN-ResNet50.mat', 'file')
+    load('models/detectors/fasterRCNN-ResNet50.mat');
+end
+
+%% 0. Load pre-trained model for RPN
 if exist('models/resnet18_malaria_NIH_MPIDB.mat', 'file')
     load('models/resnet18_malaria_NIH_MPIDB.mat');
 end
@@ -18,21 +35,12 @@ end
 if exist('data/mp-idb-falciparum.mat', 'file')
     load('data/mp-idb-falciparum.mat');
 else
-
-    % Images and GT Labels Datapath - Local
-    impath = 'C:\Users\loand\Documents\GitHub\Datasets\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\img';
-    labpath = 'C:\Users\loand\Documents\GitHub\Datasets\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\gt';
-
-    % Images and GT Labels Datapath - Server
-    %impath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/img';
-    %labpath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/gt';
-
-    % Images and Labels Datastore
+    
+    % Creation of Images and Labels Datastore
     imds = imageDatastore(impath);
-    lds = imageDatastore(labpath);
+    lds = imageDatastore(labelpath);
 
-
-    %% Labels pre-processing (resize)
+    % Image and Labels pre-processing
     inputSize = [500, 375];
     imds.ReadFcn = @(filename)preprocess_mpidb_images(filename, [inputSize(1), inputSize(2)]);
     lds.ReadFcn = @(filename)preprocess_mpidb_label_images(filename, [inputSize(1), inputSize(2)]);
@@ -42,34 +50,57 @@ else
     malariaDataset = table;
     malariaDataset.imageFilename = imds.Files(:);
 
-    %% 2. Conversion of BW ground-truths to rectangular bounding boxes to train the detector 
+    %% 2. Conversion of ground-truths to rectangular bounding boxes
     for i=1:numel(imds.Files)
-        row = 1;
+        
         I = imread(imds.Files{i});
-        L = imread(lds.Files{i});
+        figure; imshow(I);
 
-        % Obtain Bounding Boxes --- TODO transform to function
-        L_labels = imbinarize(L);
-        L_props = regionprops(L_labels, 'BoundingBox'); % for Object Detection
-        L_props2 = regionprops(L_labels, 'PixelList'); % for Semantic Segmentation
-
-        bboxNumber = max(size(L_props));
-        %figure; imshow(I);
-
-        %parasites = zeros(bboxNumber, 4);
-        parasites = [];
-        for k = 1:bboxNumber
-            box = L_props(k).BoundingBox;
-
-            if(ceil(box(3)) * ceil(box(4)) > 20)
-                parasites(row, 1:4) = [ ceil(box(1)), ceil(box(2)), ceil(box(3)), ceil(box(4)) ];
-                row = row + 1;
-                rectangle('Position', [ceil(box(1)), ceil(box(2)), ceil(box(3)), ceil(box(4))], 'EdgeColor', 'r', 'LineWidth', 2)
+        imageParasites = readtable(labelfile);
+        
+        countRing = 1;
+        countTro = 1;
+        countSchi = 1;
+        countGame = 1;
+        ring = [];
+        tro = [];
+        schi = [];
+        game = [];
+        
+        [filepath, filename, ext] = fileparts(imds.Files{i}); 
+        currentImageParasites = imageParasites(strcmp(imageParasites.filename, strcat(filename, ext)), :);
+        
+        for k = 1:height(currentImageParasites)
+            if(currentImageParasites.ymin(k) * currentImageParasites.ymax(k) < 20)
+                
+                disp(strcat('error in image: ', currentImageParasite.filename));
+                
             end
+            
+            currentBoundingBox = [ currentImageParasites.xmin(k), currentImageParasites.xmax(k), currentImageParasites.ymin(k), currentImageParasites.ymax(k) ];
+            
+            if(strcmp( currentImageParasites.parasite_type(k), 'ring' ))
+                ring(countRing, 1:4) = currentBoundingBox;
+                countRing = countRing + 1;
+            elseif(strcmp( currentImageParasites.parasite_type(k), 'tro' ))
+                tro(countTro, 1:4) = currentBoundingBox;
+                countTro = countTro + 1;
+            elseif(strcmp( currentImageParasites.parasite_type(k), 'schi' ))
+                schi(countSchi, 1:4) = currentBoundingBox;
+                countSchi = countSchi + 1;
+            elseif(strcmp( currentImageParasites.parasite_type(k), 'game' ))
+                game(countGame, 1:4) = currentBoundingBox;[ currentImageParasites.xmin, currentImageParasites.xmax, currentImageParasites.ymin, currentImageParasites.ymax ];
+                countGame = countGame + 1;
+            end
+
+            rectangle('Position', currentBoundingBox, 'EdgeColor', 'r', 'LineWidth', 2)
 
         end
 
-        malariaDataset.parasite{i} = parasites;
+        malariaDataset.ring{i} = ring;
+        malariaDataset.tro{i} = tro;
+        malariaDataset.schi{i} = schi;
+        malariaDataset.game{i} = game;
         
     end
     
@@ -102,13 +133,13 @@ testDataTbl = malariaDataset(shuffledIndices(testIdx),:);
 % Use imageDatastore and boxLabelDatastore to create datastores 
 % for loading the image and label data during training and evaluation.
 imdsTrain = imageDatastore(trainingDataTbl{:, 'imageFilename'});
-bldsTrain = boxLabelDatastore(trainingDataTbl(:, 'parasite'));
+bldsTrain = boxLabelDatastore(trainingDataTbl(:, 2:5));
 
 imdsValidation = imageDatastore(validationDataTbl{:,'imageFilename'});
-bldsValidation = boxLabelDatastore(validationDataTbl(:,'parasite'));
+bldsValidation = boxLabelDatastore(validationDataTbl(:, 2:5));
 
 imdsTest = imageDatastore(testDataTbl{:,'imageFilename'});
-bldsTest = boxLabelDatastore(testDataTbl(:,'parasite'));
+bldsTest = boxLabelDatastore(testDataTbl(:, 2:5));
 
 
 %% 4. Combine image and box label datastores 
@@ -136,9 +167,9 @@ numAnchors = 12;
 maxNumAnchors = 20;
 [anchorBoxes, meanIoU] = estimateAnchorBoxes(preprocessedTrainingData, numAnchors);
 %estimateOptimalNumberOfAnchors(preprocessedTrainingData, maxNumAnchors);
-featureExtractionNetwork = malarianet;
+featureExtractionNetwork = malarianet; %resnet50
 %featureLayer = 'activation_40_relu';
-%featureLayer = 'ation_40_relu';
+featureLayer = 'conv1_relu';
 numClasses = width(malariaDataset)-1;
 lgraph = fasterRCNNLayers(inputSize,numClasses,anchorBoxes,featureExtractionNetwork,featureLayer);
 
@@ -174,7 +205,7 @@ I = data{1};
 bbox = data{2};
 annotatedImage = insertShape(I,'Rectangle',bbox);
 annotatedImage = imresize(annotatedImage,2);
-%figure; imshow(annotatedImage)
+figure; imshow(annotatedImage)
 
 
 %% 10. Train Faster R-CNN
@@ -192,6 +223,7 @@ options = trainingOptions('adam', ...
     'Shuffle', 'every-epoch', ...
     'CheckpointPath', 'temp', ...
     'ValidationData', validationData);
+
     
 if doTrainingAndEval
     % Train the Faster R-CNN detector.
@@ -199,21 +231,19 @@ if doTrainingAndEval
     %   that training samples tightly overlap with ground truth.
     %[detector, info] = trainFasterRCNNObjectDetector(trainingData,lgraph,options, ...
     %    'NegativeOverlapRange',[0 0.3], ...
-    %    'PositiveOverlapRange',[0.6 1]);
-    
-        [detector, info] = trainFasterRCNNObjectDetector(trainingData,lgraph,options);
+    %    'PositiveOverlapRange',[0.6 1]);    
+    [detector, info] = trainFasterRCNNObjectDetector(trainingData,lgraph,options);
 else
     % Load pretrained detector for the example.
-    pretrained = load('models/Detectors/fasterRCNNResNet50EndToEndVehicleExample.mat');
+    pretrained = load('models/detectors/fasterRCNN-ResNet50.mat');
     detector = pretrained.detector;
 end
 
-%% Temp. Quick check
+
+%% 11. Test detector
 I = imread(testDataTbl.imageFilename{1});
 I = imresize(I,inputSize(1:2));
 [bboxes,scores] = detect(detector,I);
 
 I = insertObjectAnnotation(I,'rectangle',bboxes,scores);
 figure; imshow(I)
-
-

@@ -1,22 +1,33 @@
 %% Object Detection Using Faster R-CNN Deep Learning
 % source: https://www.mathworks.com/help/vision/examples/object-detection-using-faster-r-cnn-deep-learning.html
 
+%% 0. Settings
+if ispc
+    datasetpath = 'C:\Users\loand\Documents\GitHub\Datasets\MP-IDB-The-Malaria-Parasite-Image-Database-for-Image-Processing-and-Analysis\Falciparum\';
+    impath = strcat(datasetpath, 'img');
+    labelpath = strcat(datasetpath, 'gt');
+    labelfile = strcat(datasetpath, 'mp-idb-falciparum.csv');
+else
+    datasetpath = '/home/server/MATLAB/dataset/MP-IDB/Falciparum/';
+    impath = strcat(datasetpath, 'img');
+    labelpath = strcat(datasetpath, 'gt');
+    labelfile = strcat(datasetpath, 'mp-idb-falciparum.csv');
+end
+
 %% 0. Train the detector or load a pre-trained network
 doTrainingAndEval = true;
-
-% TODO: change the .mat filename
 if ~doTrainingAndEval && exist('models/detectors/fasterRCNN-ResNet50.mat', 'file')
     load('models/detectors/fasterRCNN-ResNet50.mat');
 end
 
-%% 0. Load pretrained Model
+%% 0. Load pre-trained model for RPN
 if exist('models/resnet18_malaria_NIH_MPIDB.mat', 'file')
     load('models/resnet18_malaria_NIH_MPIDB.mat');
 end
 
 %% 1. Load Data Set
-if exist('data/mp-idb-falciparum.mat', 'file')
-    load('data/mp-idb-falciparum.mat');
+if exist('data/mp-idb-falciparum-parasite-class.mat', 'file')
+    load('data/mp-idb-falciparum-parasite-class.mat');
 else
 
     % Images and GT Labels Datapath - Local
@@ -73,7 +84,7 @@ else
         
     end
     
-    save('data/mp-idb-falciparum.mat', 'malariaDataset');
+    save('data/mp-idb-falciparum-parasite-class.mat', 'malariaDataset');
     
 end
 

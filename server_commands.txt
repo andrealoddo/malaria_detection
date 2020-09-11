@@ -1,0 +1,1 @@
+nohup matlab -r MalariaParasitesDetection -nodisplay -nosplash -nodesktop > frcnn_resnet50.out < /dev/null &

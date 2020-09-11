@@ -2,5 +2,7 @@
 old/
 
 # File extensions
-*.mat
 *.asv
+*.out
+models/*.mat
+models/detectors/*.mat
